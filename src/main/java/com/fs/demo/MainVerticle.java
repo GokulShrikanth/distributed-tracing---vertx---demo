@@ -17,29 +17,25 @@ public class MainVerticle extends AbstractVerticle {
         System.setProperty("JAEGER_REPORTER_LOG_SPANS", "true");
         System.setProperty("JAEGER_SAMPLER_TYPE", "const");
         System.setProperty("JAEGER_SAMPLER_PARAM", "1");
-        tracer = Configuration.fromEnv("Demo").getTracer();
-
+        tracer = Configuration.fromEnv("sampleTracer").getTracer();
+        vertx.eventBus().registerDefaultCodec(objOverEventBus.class,new GenericCodec<objOverEventBus>(objOverEventBus.class));
         vertx.deployVerticle(new HelloVerticle());
         Router router =Router.router(vertx);
         router.get("/").handler(this::message);
-        router.get("/:name").handler(this::messagectm);
-        vertx.createHttpServer().requestHandler(router).listen(8090);
+        vertx.createHttpServer().requestHandler(router).listen(9920);
     }
     public void message(RoutingContext ctx){
-        Scope scope = (tracer.buildSpan("requestStarted to demo listener 1")).startActive(true);
-            scope.span().setTag("handler 1", "sample");
-        vertx.eventBus().request("1", "",option,reply -> {
+        try {Scope scope = (tracer.buildSpan("request Started at handler-1")).startActive(true);
+            scope.span().setTag("any tag", "any message");
+            objOverEventBus obj = new objOverEventBus(tracer, scope);
+            vertx.eventBus().publish("spanTrace", obj);
+            vertx.eventBus().request("1","",option,reply -> {
             ctx.request().response().end((String)reply.result().body());
         });
         scope.close();
-    }
-    public void messagectm(RoutingContext ctx){
-        Scope scope = (tracer.buildSpan("requestStarted to demo listener 2")).startActive(true);
-            scope.span().setTag("handler 2", "sample");
-        String name = ctx.pathParam("name");
-        vertx.eventBus().request("2",name,option,reply -> {
-            ctx.request().response().end((String)reply.result().body());
-        });
-        scope.close();
+        }
+        catch(Exception e){
+            e.printStackTrace();
+        }
     }
 }
